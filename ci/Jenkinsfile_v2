@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY_CREDENTIALS = 'dockerhub-credentials'
+        DOCKERFILE_PATH = 'ci/Dockerfile_v2'
+        IMAGE_NAME = 'enrico96/jenkins-with-react'
+        IMAGE_FOR_BUILD = 'node:15.5-alpine'
+    }
+
+    stages {
+        stage('Build App') {
+            agent { docker IMAGE_FOR_BUILD }
+            steps {
+                echo 'Building...'
+                sh 'npm install && npm run build'
+            }
+        }
+        stage('Test App') {
+            agent { docker IMAGE_FOR_BUILD }
+            steps {
+                echo 'Testing...'
+                sh '''
+                    npm install --save-dev cross-env npm run test
+                '''
+            }
+        }
+        stage('Build Image and Publish to Docker Hub') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo 'Publishing...'
+                script {
+                /* groovylint-disable-next-line NestedBlockDepth */
+                    docker.withRegistry('', REGISTRY_CREDENTIALS) {
+                        dockerImage = docker.build(IMAGE_NAME + ":$BUILD_NUMBER", "-f ${DOCKERFILE_PATH} .")
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+    }
+}

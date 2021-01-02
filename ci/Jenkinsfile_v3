@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY_CREDENTIALS = 'dockerhub-credentials'
+        DOCKERFILE_PATH = 'ci/Dockerfile_v3'
+        IMAGE_NAME = 'enrico96/jenkins-with-react'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building...'
+                script {
+                /* groovylint-disable-next-line NestedBlockDepth */
+                    docker.withRegistry('', REGISTRY_CREDENTIALS) {
+                        dockerImage = docker.build(
+                            IMAGE_NAME + ":$BUILD_NUMBER",
+                            "-f ${DOCKERFILE_PATH} . --target build"
+                        )
+                    }
+                }
+            }
+        }
+        // NOT optimized: build stage is run again
+        stage('Publish') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo 'Publishing...'
+                script {
+                /* groovylint-disable-next-line NestedBlockDepth */
+                    docker.withRegistry('', REGISTRY_CREDENTIALS) {
+                        dockerImage = docker.build(IMAGE_NAME + ":$BUILD_NUMBER", "-f ${DOCKERFILE_PATH} .")
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+    }
+}
